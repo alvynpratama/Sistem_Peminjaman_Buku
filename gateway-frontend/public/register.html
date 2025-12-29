@@ -2,82 +2,138 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Pendaftaran Akun</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pendaftaran - Library Cloud</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/js/api.js"></script>
-</head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
-    <div id="reg-card" class="max-w-md w-full bg-white p-8 rounded-xl shadow-lg border-t-8">
-        <h1 id="reg-title" class="text-2xl font-bold text-center mb-2">Buat Akun</h1>
-        <p id="reg-subtitle" class="text-center text-gray-500 mb-8 text-sm italic"></p>
+    <style>
+        /* Konfigurasi Tema (Sama dengan Dashboard) */
+        :root { --bg-color: #fcfaf2; --card-bg: white; --text-color: #1f2937; }
+        body.dark-mode { --bg-color: #0a0a0a; --card-bg: #1a1a1a; --text-color: #f3f4f6; }
+        body { background-color: var(--bg-color); color: var(--text-color); transition: all 0.3s ease; }
+
+        /* Gaya Khusus Admin (Tulisan Hitam di Light Mode) */
+        .admin-text { color: #000000 !important; font-weight: 900; }
+        body.dark-mode .admin-text { color: #f1d382 !important; }
+
+        /* Elemen Visual Gold & 3D */
+        .gold-gradient { background: linear-gradient(135deg, #d4af37, #f1d382, #b8860b); }
+        .card-3d { background: var(--card-bg); border: 1px solid rgba(212, 175, 55, 0.2); box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .btn-3d { position: relative; transition: all 0.1s ease; box-shadow: 0 4px 0 #996515; border: none; top: 0; }
+        .btn-3d:active { top: 3px; box-shadow: 0 1px 0 #996515; }
         
-        <div class="space-y-4">
+        /* Input Styling */
+        input { 
+            background: var(--bg-color) !important; 
+            color: var(--text-color) !important; 
+            border: 1px solid rgba(212, 175, 55, 0.3) !important; 
+        }
+        
+        .theme-fixed { position: fixed; top: 1.5rem; left: 1.5rem; z-index: 50; }
+        .toast-active { transform: translateY(0); opacity: 1; }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+    <div id="toast-container" class="fixed bottom-5 right-5 z-[200] flex flex-col gap-2"></div>
+
+    <div class="theme-fixed">
+        <button onclick="toggleDarkMode()" class="p-3 rounded-full card-3d text-xl shadow-lg border-2 border-amber-500/30" id="theme-toggle">🌙</button>
+    </div>
+
+    <div id="reg-card" class="max-w-md w-full card-3d p-10 rounded-[3rem] border-t-8 border-amber-500 text-center">
+        <div class="w-16 h-16 gold-gradient rounded-full mx-auto mb-6 flex items-center justify-center shadow-xl">
+            <span class="text-2xl text-white">✨</span>
+        </div>
+
+        <h1 id="reg-title" class="text-3xl font-black italic uppercase tracking-tighter mb-2">Buat Akun</h1>
+        <p id="reg-subtitle" class="text-[10px] tracking-[0.2em] uppercase font-bold opacity-60 mb-8 italic"></p>
+        
+        <div class="space-y-4 text-left">
             <div id="user-fields" class="space-y-4">
-                <div>
-                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Nama Lengkap</label>
-                    <input id="reg-fullname" type="text" placeholder="Nama Lengkap" class="w-full border p-3 rounded-lg outline-none focus:ring-2">
+                <div class="space-y-1">
+                    <label class="text-[10px] font-black uppercase opacity-60 ml-1">Nama Lengkap</label>
+                    <input id="reg-fullname" type="text" placeholder="Masukkan Nama Lengkap" class="w-full p-3 rounded-xl outline-none focus:border-amber-500 font-medium">
                 </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Email</label>
-                    <input id="reg-email" type="email" placeholder="contoh@email.com" class="w-full border p-3 rounded-lg outline-none focus:ring-2">
+                <div class="space-y-1">
+                    <label class="text-[10px] font-black uppercase opacity-60 ml-1">Email Address</label>
+                    <input id="reg-email" type="email" placeholder="contoh@email.com" class="w-full p-3 rounded-xl outline-none focus:border-amber-500 font-medium">
                 </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Nomor Telepon</label>
-                    <input id="reg-phone" type="text" placeholder="08123xxx" class="w-full border p-3 rounded-lg outline-none focus:ring-2">
+                <div class="space-y-1">
+                    <label class="text-[10px] font-black uppercase opacity-60 ml-1">Nomor Telepon</label>
+                    <input id="reg-phone" type="text" placeholder="08123xxxx" class="w-full p-3 rounded-xl outline-none focus:border-amber-500 font-medium">
                 </div>
             </div>
 
-            <div>
-                <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Username</label>
-                <input id="reg-user" type="text" placeholder="Username" class="w-full border p-3 rounded-lg outline-none focus:ring-2">
+            <div class="space-y-1">
+                <label class="text-[10px] font-black uppercase opacity-60 ml-1">Username</label>
+                <input id="reg-user" type="text" placeholder="Username" class="w-full p-3 rounded-xl outline-none focus:border-amber-500 font-bold">
             </div>
-            <div>
-                <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Password</label>
-                <input id="reg-pass" type="password" placeholder="Password" class="w-full border p-3 rounded-lg outline-none focus:ring-2">
+            <div class="space-y-1">
+                <label class="text-[10px] font-black uppercase opacity-60 ml-1">Password</label>
+                <input id="reg-pass" type="password" placeholder="••••••••" class="w-full p-3 rounded-xl outline-none focus:border-amber-500 font-bold">
             </div>
 
-            <button id="reg-btn" onclick="executeRegister()" class="w-full text-white font-bold py-3 rounded-lg shadow-md mt-4 transition-all active:scale-95">
-                DAFTARKAN SEKARANG
+            <button id="reg-btn" onclick="executeRegister()" class="w-full gold-gradient text-white font-black py-4 rounded-xl btn-3d tracking-widest uppercase mt-4 text-sm">
+                Daftarkan Sekarang
             </button>
             
-            <p class="text-center text-sm mt-4">
-                <a id="back-link" href="/" class="hover:underline font-bold">Kembali ke Login</a>
+            <p class="text-center text-xs mt-6 font-bold opacity-80">
+                Sudah punya akun? 
+                <a id="back-link" href="/" class="text-amber-600 hover:underline">Masuk Disini</a>
             </p>
         </div>
     </div>
 
     <script>
+        // Logika Notifikasi Toast Custom
+        function showNotify(msg, type = 'error') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `px-6 py-3 rounded-xl shadow-2xl border-l-8 font-bold transition-all duration-300 transform translate-y-10 opacity-0 ${
+                type === 'error' ? 'bg-red-50 text-red-700 border-red-500' : 'bg-green-50 text-green-700 border-green-500'
+            }`;
+            toast.innerText = msg;
+            container.appendChild(toast);
+            setTimeout(() => { toast.classList.add('toast-active', 'translate-y-0'); toast.classList.remove('opacity-0'); }, 10);
+            setTimeout(() => { 
+                toast.classList.remove('toast-active', 'translate-y-0'); toast.classList.add('opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Dark Mode Logic
+        function toggleDarkMode() {
+            const body = document.body; const btn = document.getElementById('theme-toggle');
+            body.classList.toggle('dark-mode');
+            const isDark = body.classList.contains('dark-mode');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            btn.innerText = isDark ? '☀️' : '🌙';
+        }
+
         const params = new URLSearchParams(window.location.search);
         const roleTarget = params.get('role') || 'user';
 
         window.onload = () => {
+            // Load Saved Theme
+            if(localStorage.getItem('theme') === 'dark') toggleDarkMode();
+
             const userFields = document.getElementById('user-fields');
-            const card = document.getElementById('reg-card');
             const title = document.getElementById('reg-title');
             const subtitle = document.getElementById('reg-subtitle');
-            const btn = document.getElementById('reg-btn');
             const backLink = document.getElementById('back-link');
-            const inputs = document.querySelectorAll('input');
 
+            // Penyesuaian UI Berdasarkan Role
             if (roleTarget === 'admin') {
                 userFields.classList.add('hidden');
-                card.classList.add('border-purple-600');
-                title.classList.add('text-purple-600');
+                title.innerHTML = `<span class="admin-text">Admin</span> Registration`;
                 subtitle.innerText = "Portal Pendaftaran Administrator";
-                btn.classList.add('bg-purple-600', 'hover:bg-purple-700');
-                inputs.forEach(input => input.classList.add('focus:ring-purple-200'));
                 backLink.href = "/admin";
-                backLink.classList.add('text-purple-600');
                 backLink.innerText = "← Kembali ke Login Admin";
             } else {
-                card.classList.add('border-indigo-600');
-                title.classList.add('text-indigo-600');
+                title.classList.add('text-amber-600');
                 subtitle.innerText = "Portal Pendaftaran Member Mahasiswa";
-                btn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
-                inputs.forEach(input => input.classList.add('focus:ring-indigo-200'));
                 backLink.href = "/";
-                backLink.classList.add('text-indigo-600');
-                backLink.innerText = "← Kembali ke Login User";
+                backLink.innerText = "← Kembali ke Login Member";
             }
         };
 
@@ -91,19 +147,32 @@
                 role: roleTarget
             };
 
+            // Validasi Sederhana
+            if(!username || !password) return showNotify("Username dan Password wajib diisi!");
+
             if (roleTarget === 'user') {
                 body.full_name = document.getElementById('reg-fullname').value;
                 body.email = document.getElementById('reg-email').value;
                 body.phone_number = document.getElementById('reg-phone').value;
                 
-                if(!body.email) return alert("Email wajib diisi untuk User!");
+                if(!body.full_name || !body.email) return showNotify("Data diri wajib diisi lengkap untuk Member!");
             }
 
-            if(!username || !password) return alert("Username dan Password wajib diisi!");
-
-            const { status, data } = await callAPI(`${AUTH_URL}/register`, 'POST', body);
-            alert(data.message);
-            if (status === 201) window.location.href = (roleTarget === 'admin') ? '/admin' : '/';
+            // Memanggil API (Fungsi callAPI diasumsikan ada di /js/api.js)
+            try {
+                const { status, data } = await callAPI(`${AUTH_URL}/register`, 'POST', body);
+                
+                if (status === 201 || status === 200) {
+                    showNotify("Pendaftaran Berhasil!", "success");
+                    setTimeout(() => {
+                        window.location.href = (roleTarget === 'admin') ? '/admin' : '/';
+                    }, 1500);
+                } else {
+                    showNotify(data.message || "Pendaftaran Gagal.");
+                }
+            } catch (err) {
+                showNotify("Gagal terhubung ke server.");
+            }
         }
     </script>
 </body>

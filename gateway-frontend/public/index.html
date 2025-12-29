@@ -7,16 +7,25 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/js/api.js"></script>
     <script src="/js/auth.js"></script>
+    
     <style>
+        /* CSS Variables: Memudahkan manajemen warna untuk Light/Dark Mode */
         :root { --bg-color: #fcfaf2; --card-bg: white; --text-color: #1f2937; --sub-text: #4b5563; }
         body.dark-mode { --bg-color: #0a0a0a; --card-bg: rgba(255,255,255,0.05); --text-color: #f3f4f6; --sub-text: #9ca3af; }
+        
         body { background-color: var(--bg-color); color: var(--text-color); transition: all 0.3s ease; }
+        
+        /* Premium UI Elements: Gradasi Emas & Efek 3D */
         .gold-gradient { background: linear-gradient(135deg, #d4af37, #f1d382, #b8860b); }
         .gold-border { border: 2px solid #d4af37; }
         .card-3d { background: var(--card-bg); border: 1px solid rgba(212, 175, 55, 0.2); backdrop-filter: blur(10px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); transition: all 0.3s ease; }
         .card-3d:hover { transform: translateY(-5px); border-color: #d4af37; box-shadow: 0 15px 30px rgba(212, 175, 55, 0.3); }
+        
+        /* Interactive Elements: Feedback visual saat tombol ditekan */
         .btn-3d { position: relative; transition: all 0.1s ease; box-shadow: 0 4px 0 #996515; border: none; top: 0; }
         .btn-3d:active { transform: translateY(3px); box-shadow: 0 1px 0 #996515; }
+        
+        /* Navigation & Overlays */
         .theme-fixed { position: fixed; top: 1.5rem; left: 1.5rem; z-index: 50; }
         #sidebar-history { transition: transform 0.4s ease; background: var(--card-bg); backdrop-filter: blur(20px); border-left: 4px solid #d4af37; z-index: 100; }
         .sidebar-hidden { transform: translateX(100%); }
@@ -96,6 +105,7 @@
     </div>
 
     <script>
+        /* Utility: Sistem Notifikasi Toast */
         function showNotify(msg, type = 'error') {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
@@ -106,6 +116,7 @@
             setTimeout(() => { toast.classList.remove('toast-active', 'translate-y-0'); toast.classList.add('opacity-0'); setTimeout(() => toast.remove(), 300); }, 3000);
         }
 
+        /* Utility: Custom Confirmation Logic */
         let confirmAction = null;
         function showCustomConfirm(msg, action, icon = '⚠️') {
             document.getElementById('confirm-msg').innerText = msg;
@@ -116,6 +127,7 @@
         function closeConfirm() { document.getElementById('confirm-modal').classList.add('hidden'); confirmAction = null; }
         document.getElementById('confirm-ok').onclick = () => { if(confirmAction) confirmAction(); closeConfirm(); };
 
+        /* Theme Management: Menyimpan preferensi ke LocalStorage */
         function toggleDarkMode() {
             const body = document.body; const btn = document.getElementById('theme-toggle');
             body.classList.toggle('dark-mode');
@@ -123,38 +135,104 @@
             localStorage.setItem('theme', isDark ? 'dark' : 'light');
             btn.innerText = isDark ? '☀️' : '🌙';
         }
-        window.onload = () => { if(localStorage.getItem('theme') === 'dark') toggleDarkMode(); const token = localStorage.getItem('user_token'); if (token) showDashboard(localStorage.getItem('user_role')); };
+        
+        // Initial Load: Cek sesi login dan tema saat page dimuat
+        window.onload = () => { 
+            if(localStorage.getItem('theme') === 'dark') toggleDarkMode(); 
+            const token = localStorage.getItem('user_token'); 
+            if (token) showDashboard(localStorage.getItem('user_role')); 
+        };
+        
         function toggleSidebar() { document.getElementById('sidebar-history').classList.toggle('sidebar-hidden'); }
 
+        /* Authentication Logic */
         async function handleLogin() {
             const u = document.getElementById('user').value; const p = document.getElementById('pass').value;
             if(!u || !p) return showNotify("Username dan Password wajib diisi!");
             const { status, data } = await callAPI(`${AUTH_URL}/login`, 'POST', { username: u, password: p }, 'user');
-            if (data && data.token) { localStorage.setItem('user_token', data.token); localStorage.setItem('user_role', data.role); localStorage.setItem('user_full_name', data.name || ''); localStorage.setItem('user_username', data.username || ''); localStorage.setItem('user_email', data.email || ''); localStorage.setItem('user_phone', data.phone || ''); location.reload(); } 
+            if (data && data.token) { 
+                // Simpan session data secara lokal
+                localStorage.setItem('user_token', data.token); 
+                localStorage.setItem('user_role', data.role); 
+                localStorage.setItem('user_full_name', data.name || ''); 
+                localStorage.setItem('user_username', data.username || ''); 
+                localStorage.setItem('user_email', data.email || ''); 
+                localStorage.setItem('user_phone', data.phone || ''); 
+                location.reload(); 
+            } 
             else { showNotify("Login Gagal! Akun tidak ditemukan."); }
         }
 
         function confirmLogout() { showCustomConfirm("Yakin ingin mengakhiri sesi?", () => logout(), '🚪'); }
-        function showDashboard(role) { document.getElementById('auth-section').classList.add('hidden'); document.getElementById('dashboard').classList.remove('hidden'); document.getElementById('welcome').innerText = localStorage.getItem('user_full_name') || 'Guest'; refreshUserData(); setInterval(refreshUserData, 5000); }
-        function refreshUserData() { if(!document.getElementById('dashboard').classList.contains('hidden')) { loadBooks(); loadHistory(); } }
+        
+        /* Dashboard & Data Loading */
+        function showDashboard(role) { 
+            document.getElementById('auth-section').classList.add('hidden'); 
+            document.getElementById('dashboard').classList.remove('hidden'); 
+            document.getElementById('welcome').innerText = localStorage.getItem('user_full_name') || 'Guest'; 
+            refreshUserData(); 
+            setInterval(refreshUserData, 5000); // Polling data setiap 5 detik
+        }
+        
+        function refreshUserData() { 
+            if(!document.getElementById('dashboard').classList.contains('hidden')) { loadBooks(); loadHistory(); } 
+        }
 
+        /* Render: Katalog Buku dengan efek grayscale jika stok habis */
         async function loadBooks() {
             const { data } = await callAPI(`${MAIN_URL}/books`, 'GET', null, 'user');
             const list = document.getElementById('book-list'); if(!data) return;
             list.innerHTML = data.map(b => `<div class="card-3d p-6 rounded-[2rem] flex flex-col gap-4 ${!b.stock > 0 ? 'opacity-50 grayscale' : ''}"><div class="relative overflow-hidden rounded-2xl"><img src="${b.cover_url || 'https://via.placeholder.com/300x450'}" class="w-full h-72 object-cover transition-transform hover:scale-110 duration-500"><div class="absolute top-3 left-3 gold-gradient text-white px-3 py-1 rounded-full font-black text-[10px] shadow-lg">${b.year}</div></div><div class="flex-1"><h4 class="text-xl font-black leading-tight truncate uppercase tracking-tighter">${b.title}</h4><p class="text-amber-500 font-bold text-sm mb-3 tracking-widest">${b.author}</p><span class="bg-amber-500/10 text-amber-600 text-[10px] px-3 py-1 rounded-full font-black border border-amber-500/20 uppercase italic">${b.genre}</span></div><div class="flex justify-between items-center pt-4 border-t border-dashed border-amber-500/20 pb-4"><div class="flex flex-col"><span class="${b.stock > 0 ? 'text-green-500' : 'text-red-500'} text-[10px] font-black uppercase tracking-widest">${b.stock > 0 ? '● Tersedia' : '● Habis'}</span><span class="text-xs opacity-50 font-bold italic">Unit: ${b.stock}</span></div><button onclick="${b.stock > 0 ? `borrowBook(${b.id})` : ''}" class="px-8 py-3 rounded-xl font-black text-xs btn-3d ${b.stock > 0 ? 'gold-gradient text-white' : 'bg-gray-500 text-white shadow-none'} uppercase tracking-widest">PINJAM</button></div></div>`).join('');
         }
 
+        /* Render: List Riwayat pada Sidebar */
         async function loadHistory() {
             const { data } = await callAPI(`${MAIN_URL}/borrowings/all`, 'GET', null, 'user');
             const historyDiv = document.getElementById('history-list'); if (!data || data.length === 0) { historyDiv.innerHTML = '<p class="text-center py-10 opacity-50 italic text-sm">Belum ada riwayat</p>'; return; }
             historyDiv.innerHTML = data.map(h => `<div class="card-3d p-4 rounded-2xl border-l-4 ${h.return_date ? 'border-green-500' : 'border-amber-500'} flex gap-4 items-center border border-gray-100/10"><img src="${h.cover_url || 'https://via.placeholder.com/50x75'}" class="w-14 h-20 object-cover rounded-xl shadow-lg"><div class="flex-1 overflow-hidden"><p class="font-black text-xs truncate uppercase tracking-tighter">${h.title}</p><p class="text-[9px] opacity-60 font-bold uppercase mt-1 tracking-widest">Out: ${h.borrow_date.replace('T', ' ').slice(0, 16)}</p>${h.return_date ? `<p class="text-[9px] text-green-500 font-bold uppercase mt-0.5 tracking-widest italic">In: ${h.return_date.replace('T', ' ').slice(0, 16)}</p>` : ''}<div class="mt-3 pb-4">${!h.return_date ? `<button onclick="confirmReturn(${h.id})" class="mt-3 w-full gold-gradient text-white py-3 rounded-xl text-[9px] font-black btn-3d uppercase tracking-widest">KEMBALIKAN</button>` : '<div class="mt-2 text-[9px] font-black text-green-600 uppercase italic tracking-widest pt-1 border-t border-gray-100/10 text-center">Returned</div>'}</div></div></div>`).join('');
         }
 
+        /* Profile & Transaction Logic */
         function confirmReturn(id) { showCustomConfirm("Kembalikan buku ini sekarang?", () => returnBook(id), '📚'); }
-        function toggleProfile() { document.getElementById('profile-modal').classList.toggle('hidden'); if(!document.getElementById('profile-modal').classList.contains('hidden')) { document.getElementById('prof-name').value = localStorage.getItem('user_full_name'); document.getElementById('prof-user').value = localStorage.getItem('user_username'); document.getElementById('prof-email').value = localStorage.getItem('user_email'); document.getElementById('prof-phone').value = localStorage.getItem('user_phone'); } }
-        async function saveProfile() { const n = document.getElementById('prof-name').value; const u = document.getElementById('prof-user').value; const p = document.getElementById('prof-phone').value; if(!n || !u || !p) return showNotify("Semua data profil wajib diisi!"); const body = { full_name: n, username: u, phone_number: p }; const { status } = await callAPI(`${AUTH_URL}/profile/update`, 'POST', body, 'user'); if(status === 200) { localStorage.setItem('user_full_name', body.full_name); localStorage.setItem('user_username', body.username); localStorage.setItem('user_phone', body.phone_number); showNotify("Profil Berhasil Diperbarui!", "success"); location.reload(); } }
-        async function borrowBook(id) { const body = { book_id: id, borrower_name: localStorage.getItem('user_full_name'), borrower_phone: localStorage.getItem('user_phone') }; const { data } = await callAPI(`${MAIN_URL}/borrow`, 'POST', body, 'user'); showNotify(data.message, "success"); refreshUserData(); }
-        async function returnBook(id) { const { data } = await callAPI(`${MAIN_URL}/return`, 'POST', { borrowing_id: id }, 'user'); showNotify(data.message, "success"); refreshUserData(); }
+        
+        function toggleProfile() { 
+            document.getElementById('profile-modal').classList.toggle('hidden'); 
+            if(!document.getElementById('profile-modal').classList.contains('hidden')) { 
+                document.getElementById('prof-name').value = localStorage.getItem('user_full_name'); 
+                document.getElementById('prof-user').value = localStorage.getItem('user_username'); 
+                document.getElementById('prof-email').value = localStorage.getItem('user_email'); 
+                document.getElementById('prof-phone').value = localStorage.getItem('user_phone'); 
+            } 
+        }
+
+        async function saveProfile() { 
+            const n = document.getElementById('prof-name').value; 
+            const u = document.getElementById('prof-user').value; 
+            const p = document.getElementById('prof-phone').value; 
+            if(!n || !u || !p) return showNotify("Semua data profil wajib diisi!"); 
+            const body = { full_name: n, username: u, phone_number: p }; 
+            const { status } = await callAPI(`${AUTH_URL}/profile/update`, 'POST', body, 'user'); 
+            if(status === 200) { 
+                localStorage.setItem('user_full_name', body.full_name); 
+                localStorage.setItem('user_username', body.username); 
+                localStorage.setItem('user_phone', body.phone_number); 
+                showNotify("Profil Berhasil Diperbarui!", "success"); 
+                location.reload(); 
+            } 
+        }
+
+        async function borrowBook(id) { 
+            const body = { book_id: id, borrower_name: localStorage.getItem('user_full_name'), borrower_phone: localStorage.getItem('user_phone') }; 
+            const { data } = await callAPI(`${MAIN_URL}/borrow`, 'POST', body, 'user'); 
+            showNotify(data.message, "success"); 
+            refreshUserData(); 
+        }
+
+        async function returnBook(id) { 
+            const { data } = await callAPI(`${MAIN_URL}/return`, 'POST', { borrowing_id: id }, 'user'); 
+            showNotify(data.message, "success"); 
+            refreshUserData(); 
+        }
     </script>
 </body>
 </html>

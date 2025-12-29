@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Pendaftaran Akun</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/js/api.js"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+    <div id="reg-card" class="max-w-md w-full bg-white p-8 rounded-xl shadow-lg border-t-8">
+        <h1 id="reg-title" class="text-2xl font-bold text-center mb-2">Buat Akun</h1>
+        <p id="reg-subtitle" class="text-center text-gray-500 mb-8 text-sm italic"></p>
+        
+        <div class="space-y-4">
+            <div id="user-fields" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Nama Lengkap</label>
+                    <input id="reg-fullname" type="text" placeholder="Nama Lengkap" class="w-full border p-3 rounded-lg outline-none focus:ring-2">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Email</label>
+                    <input id="reg-email" type="email" placeholder="contoh@email.com" class="w-full border p-3 rounded-lg outline-none focus:ring-2">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Nomor Telepon</label>
+                    <input id="reg-phone" type="text" placeholder="08123xxx" class="w-full border p-3 rounded-lg outline-none focus:ring-2">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Username</label>
+                <input id="reg-user" type="text" placeholder="Username" class="w-full border p-3 rounded-lg outline-none focus:ring-2">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Password</label>
+                <input id="reg-pass" type="password" placeholder="Password" class="w-full border p-3 rounded-lg outline-none focus:ring-2">
+            </div>
+
+            <button id="reg-btn" onclick="executeRegister()" class="w-full text-white font-bold py-3 rounded-lg shadow-md mt-4 transition-all active:scale-95">
+                DAFTARKAN SEKARANG
+            </button>
+            
+            <p class="text-center text-sm mt-4">
+                <a id="back-link" href="/" class="hover:underline font-bold">Kembali ke Login</a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const roleTarget = params.get('role') || 'user';
+
+        window.onload = () => {
+            const userFields = document.getElementById('user-fields');
+            const card = document.getElementById('reg-card');
+            const title = document.getElementById('reg-title');
+            const subtitle = document.getElementById('reg-subtitle');
+            const btn = document.getElementById('reg-btn');
+            const backLink = document.getElementById('back-link');
+            const inputs = document.querySelectorAll('input');
+
+            if (roleTarget === 'admin') {
+                userFields.classList.add('hidden');
+                card.classList.add('border-purple-600');
+                title.classList.add('text-purple-600');
+                subtitle.innerText = "Portal Pendaftaran Administrator";
+                btn.classList.add('bg-purple-600', 'hover:bg-purple-700');
+                inputs.forEach(input => input.classList.add('focus:ring-purple-200'));
+                backLink.href = "/admin";
+                backLink.classList.add('text-purple-600');
+                backLink.innerText = "← Kembali ke Login Admin";
+            } else {
+                card.classList.add('border-indigo-600');
+                title.classList.add('text-indigo-600');
+                subtitle.innerText = "Portal Pendaftaran Member Mahasiswa";
+                btn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+                inputs.forEach(input => input.classList.add('focus:ring-indigo-200'));
+                backLink.href = "/";
+                backLink.classList.add('text-indigo-600');
+                backLink.innerText = "← Kembali ke Login User";
+            }
+        };
+
+        async function executeRegister() {
+            const username = document.getElementById('reg-user').value;
+            const password = document.getElementById('reg-pass').value;
+
+            const body = {
+                username,
+                password,
+                role: roleTarget
+            };
+
+            if (roleTarget === 'user') {
+                body.full_name = document.getElementById('reg-fullname').value;
+                body.email = document.getElementById('reg-email').value;
+                body.phone_number = document.getElementById('reg-phone').value;
+                
+                if(!body.email) return alert("Email wajib diisi untuk User!");
+            }
+
+            if(!username || !password) return alert("Username dan Password wajib diisi!");
+
+            const { status, data } = await callAPI(`${AUTH_URL}/register`, 'POST', body);
+            alert(data.message);
+            if (status === 201) window.location.href = (roleTarget === 'admin') ? '/admin' : '/';
+        }
+    </script>
+</body>
+</html>

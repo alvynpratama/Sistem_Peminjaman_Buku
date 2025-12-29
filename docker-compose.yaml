@@ -1,0 +1,80 @@
+services:
+  # --- DATABASE AUTH ---
+  db-auth:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: password_dosen
+      MYSQL_DATABASE: auth_db
+    volumes:
+      - ./db-init/auth.sql:/docker-entrypoint-initdb.d/auth.sql
+      - auth_db_data:/var/lib/mysql
+    networks:
+      - library-net
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 5s
+      retries: 10
+
+  # --- DATABASE MAIN ---
+  db-main:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: password_dosen
+      MYSQL_DATABASE: project_db
+    volumes:
+      - ./db-init/main.sql:/docker-entrypoint-initdb.d/main.sql
+      - main_db_data:/var/lib/mysql
+    networks:
+      - library-net
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 5s
+      retries: 10
+
+  # --- AUTH SERVICE ---
+  auth-service:
+    build: ./auth-service
+    ports:
+      - "5001:5000"
+    depends_on:
+      db-auth:
+        condition: service_healthy
+    environment:
+      DB_HOST: db-auth
+      DB_NAME: auth_db
+    networks:
+      - library-net
+
+  # --- MAIN SERVICE ---
+  main-service:
+    build: ./main-service
+    ports:
+      - "5002:5000"
+    depends_on:
+      db-main:
+        condition: service_healthy
+    environment:
+      DB_HOST: db-main
+      DB_NAME: project_db
+    networks:
+      - library-net
+
+  # --- FRONTEND GATEWAY ---
+  gateway-frontend:
+    build: ./gateway-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - auth-service
+      - main-service
+    networks:
+      - library-net
+
+# --- DEFINISI NETWORKS & VOLUMES ---
+networks:
+  library-net:
+    driver: bridge
+
+volumes:
+  auth_db_data:
+  main_db_data:

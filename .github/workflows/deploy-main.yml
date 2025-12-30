@@ -1,0 +1,28 @@
+name: Deploy Main Service to Azure
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'main-service/**' # Berjalan jika ada perubahan di folder main-service
+
+jobs:
+  build-and-deploy:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20.x'
+
+      - name: Install dependencies
+        run: npm install
+        working-directory: main-service # Fokus ke folder main-service
+
+      - name: 'Deploy to Azure Web App'
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: 'main-peminjaman-cloud' # Nama Web App Main Anda
+          publish-profile: ${{ secrets.AZURE_MAIN_SERVICE_PUBLISH_PROFILE }}
+          package: ./main-service

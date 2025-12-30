@@ -8,8 +8,9 @@
  * PENTING: Ganti URL di bawah ini dengan URL Web App Azure yang Anda buat nanti.
  * localhost tidak bisa diakses dari internet (Azure).
  */
-const AUTH_URL = 'https://auth-peminjaman-cloud.azurewebsites.net'; // URL Azure untuk Auth Service
-const MAIN_URL = 'https://main-peminjaman-cloud.azurewebsites.net'; // URL Azure untuk Main Service
+
+const AUTH_URL = 'https://auth-peminjaman-cloud-cxc8c5dfebfmeyhf.koreacentral-01.azurewebsites.net';
+const MAIN_URL = 'https://main-peminjaman-cloud-eqfjc5drcydfcta4.koreacentral-01.azurewebsites.net';
 
 /**
  * FUNGSI GLOBAL: callAPI

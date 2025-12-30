@@ -1,0 +1,28 @@
+name: Deploy Auth Service to Azure
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'auth-service/**' # Hanya jalan jika ada perubahan di folder auth-service
+
+jobs:
+  build-and-deploy:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20.x'
+
+      - name: Install dependencies
+        run: npm install
+        working-directory: auth-service # Fokus ke folder auth-service
+
+      - name: 'Deploy to Azure Web App'
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: 'auth-peminjaman-cloud' # Ganti dengan nama Web App Auth Anda
+          publish-profile: ${{ secrets.AZURE_AUTH_SERVICE_PUBLISH_PROFILE }} # Lihat catatan di bawah
+          package: ./auth-service

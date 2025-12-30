@@ -28,12 +28,13 @@ jobs:
           npm install
           npm run build --if-present
           npm run test --if-present
-      
+        working-directory: gateway-frontend/public # Masuk ke folder yang benar
+
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: .
+          path: gateway-frontend/public # Mengambil file dari folder publik
 
   deploy:
     runs-on: ubuntu-latest
@@ -62,4 +63,3 @@ jobs:
           app-name: 'peminjaman-buku'
           slot-name: 'Production'
           package: .
-          

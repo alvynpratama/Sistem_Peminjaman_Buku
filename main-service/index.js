@@ -6,32 +6,59 @@ const cors = require('cors');
 const app = express();
 app.use(express.json());
 
-// 1. CORS - Gunakan konfigurasi yang sudah kita sepakati
+// 1. CORS - Menangani izin akses dari Frontend Azure
 app.use(cors({
     origin: 'https://peminjaman-buku-cxbrajbnh9cdemgu.koreacentral-01.azurewebsites.net',
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// 2. KONEKSI DATABASE (Pastikan DB_HOST dkk sudah ada di portal)
+/**
+ * 2. KONFIGURASI DATABASE
+ * Menggunakan SSL dan variabel lingkungan dari Azure Portal
+ */
 const db = mysql.createPool({
     host: process.env.DB_HOST,
-    user: process.env.DB_USER,
+    user: process.env.DB_USER || 'taufiq', 
     password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    ssl: { rejectUnauthorized: false }
+    database: process.env.DB_NAME || 'project_db',
+    port: 3306,
+    ssl: { rejectUnauthorized: false }, 
+    waitForConnections: true,
+    connectionLimit: 10
 });
 
-// 3. RUTE PENGETESAN (Health Check)
-// Buka URL utama Anda tanpa tambahan apa pun. Jika muncul tulisan ini, Backend AMAN.
-app.get('/', (req, res) => {
-    res.send('<h1>Backend Main Service Berhasil Jalan!</h1>');
-});
+const JWT_SECRET = process.env.JWT_SECRET || 'secret_kunci_dosen';
+
+// Utilitas Waktu Jakarta
+const getJakartaTime = () => {
+    const now = new Date();
+    const jkt = new Date(now.getTime() + (7 * 60 * 60 * 1000));
+    return jkt.toISOString().slice(0, 19).replace('T', ' ');
+};
+
+// Middleware Otentikasi Token
+const authenticate = (req, res, next) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: "Akses ditolak, token hilang" });
+
+    jwt.verify(token, JWT_SECRET, (err, decoded) => {
+        if (err) return res.status(403).json({ message: "Sesi kadaluarsa" });
+        req.user = decoded;
+        next();
+    });
+};
 
 /**
- * 4. ENDPOINT BOOKS
- * Pastikan penulisan '/books' kecil semua.
+ * 3. ENDPOINTS
  */
+
+// Health Check - Buka ini untuk memastikan server hidup
+app.get('/', (req, res) => {
+    res.send('<h1>Main Service Berhasil Jalan di Azure!</h1>');
+});
+
+// Menampilkan daftar buku
 app.get('/books', (req, res) => {
     db.query('SELECT * FROM books ORDER BY id DESC', (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -39,9 +66,53 @@ app.get('/books', (req, res) => {
     });
 });
 
-// ... (Masukkan rute /borrow, /borrowings/all, /return di sini)
+// Tambah atau Update Buku
+app.post('/books', authenticate, (req, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: "Akses khusus Admin" });
+    const { id, title, author, year, genre, cover_url, stock } = req.body;
 
-// 5. PORT AZURE
+    if (id) {
+        const query = 'UPDATE books SET title=?, author=?, year=?, genre=?, cover_url=?, stock=? WHERE id=?';
+        db.query(query, [title, author, year, genre, cover_url, stock, id], (err) => {
+            if (err) return res.status(500).json(err);
+            res.json({ message: "Buku diperbarui" });
+        });
+    } else {
+        const query = 'INSERT INTO books (title, author, year, genre, cover_url, stock) VALUES (?, ?, ?, ?, ?, ?)';
+        db.query(query, [title, author, year, genre, cover_url || '', stock], (err) => {
+            if (err) return res.status(500).json(err);
+            res.status(201).json({ message: "Buku ditambahkan" });
+        });
+    }
+});
+
+// Hapus Buku
+app.delete('/books/:id', authenticate, (req, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: "Akses khusus Admin" });
+    db.query('DELETE FROM books WHERE id = ?', [req.params.id], (err) => {
+        if (err) return res.status(500).json(err);
+        res.json({ message: "Buku dihapus" });
+    });
+});
+
+// Monitoring Peminjaman
+app.get('/borrowings/all', authenticate, (req, res) => {
+    let query = `SELECT b.id, bk.title, b.borrow_date, b.return_date, b.borrower_name 
+                 FROM borrowings b JOIN books bk ON b.book_id = bk.id`;
+    let params = [];
+    if (req.user.role !== 'admin') {
+        query += " WHERE b.user_id = ?";
+        params.push(req.user.id);
+    }
+    db.query(query + " ORDER BY b.id DESC", params, (err, results) => {
+        if (err) return res.status(500).json(err);
+        res.json(results);
+    });
+});
+
+/**
+ * 4. LISTEN - Menggunakan Named Pipe Azure
+ */
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
     console.log(`Main Service Aktif di Port: ${PORT}`);

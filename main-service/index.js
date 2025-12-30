@@ -6,43 +6,43 @@ const cors = require('cors');
 const app = express();
 app.use(express.json());
 
-// 1. PENANGANAN CORS (Handled via Code)
-// Pastikan tidak ada URL di menu CORS Azure Portal agar tidak bentrok
+// 1. CORS - Gunakan konfigurasi yang sudah kita sepakati
 app.use(cors({
     origin: 'https://peminjaman-buku-cxbrajbnh9cdemgu.koreacentral-01.azurewebsites.net',
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-/**
- * 2. KONFIGURASI DATABASE
- */
+// 2. KONEKSI DATABASE (Pastikan DB_HOST dkk sudah ada di portal)
 const db = mysql.createPool({
-    host: process.env.DB_HOST || 'db-peminjaman-buku.mysql.database.azure.com',
-    user: process.env.DB_USER || 'taufiq', 
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME || 'project_db',
-    port: 3306,
-    ssl: { rejectUnauthorized: false }, // Wajib untuk Azure MySQL
-    waitForConnections: true,
-    connectionLimit: 10
+    database: process.env.DB_NAME,
+    ssl: { rejectUnauthorized: false }
 });
 
-const JWT_SECRET = process.env.JWT_SECRET || 'secret_kunci_dosen';
-
-// Route pengetesan (Health Check)
-// Buka URL utama Anda di browser. Jika muncul tulisan ini, berarti 403 sudah hilang.
+// 3. RUTE PENGETESAN (Health Check)
+// Buka URL utama Anda tanpa tambahan apa pun. Jika muncul tulisan ini, Backend AMAN.
 app.get('/', (req, res) => {
-    res.send('Main Service is running perfectly on Azure!');
+    res.send('<h1>Backend Main Service Berhasil Jalan!</h1>');
 });
-
-// ... (Logic getJakartaTime, authenticate, /books, /borrow, /borrowings/all tetap sama)
 
 /**
- * 3. PENYESUAIAN LISTEN UNTUK AZURE WINDOWS
- * Menggunakan process.env.PORT tanpa IP '0.0.0.0' untuk mendukung Named Pipes
+ * 4. ENDPOINT BOOKS
+ * Pastikan penulisan '/books' kecil semua.
  */
-const PORT = process.env.PORT || 8080; 
+app.get('/books', (req, res) => {
+    db.query('SELECT * FROM books ORDER BY id DESC', (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(results);
+    });
+});
+
+// ... (Masukkan rute /borrow, /borrowings/all, /return di sini)
+
+// 5. PORT AZURE
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
     console.log(`Main Service Aktif di Port: ${PORT}`);
 });

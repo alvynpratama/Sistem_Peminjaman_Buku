@@ -24,12 +24,11 @@ jobs:
           node-version: '20.x'
 
       - name: npm install and build
-        # Masuk ke folder main-service
+        # Masuk ke folder main-service agar menemukan package.json
         working-directory: main-service 
         run: |
           npm install
           npm run build --if-present
-          # Perbaikan: Perintah 'npm run test' dihapus agar tidak menyebabkan error exit code 1
       
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
@@ -40,8 +39,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: build
-    environment:
-      name: 'Production'
+    # Perbaikan: Baris 'environment' dihapus agar 'subject claim' kembali ke format branch standar
     permissions:
       id-token: write
       contents: read
@@ -63,7 +61,7 @@ jobs:
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
         with:
-          # Pastikan suffix nama aplikasi sesuai dengan portal Anda
+          # Pastikan nama aplikasi sesuai dengan yang ada di Azure Portal
           app-name: 'main-peminjaman-cloud-eqfjc5drcydfcta4' 
           slot-name: 'Production'
           package: .

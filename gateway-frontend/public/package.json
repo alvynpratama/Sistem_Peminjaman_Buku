@@ -1,8 +1,7 @@
 {
-  "name": "library-cloud",
+  "name": "peminjaman-buku",
   "version": "1.0.0",
   "scripts": {
-    "build": "echo 'No build needed'",
-    "test": "echo 'No test needed'"
+    "start": "echo 'Static site running on IIS'"
   }
 }

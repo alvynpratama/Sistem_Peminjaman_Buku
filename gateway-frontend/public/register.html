@@ -7,12 +7,12 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/js/api.js"></script>
     <style>
-        /* Konfigurasi Tema (Sama dengan Dashboard) */
+        /* Konfigurasi Tema */
         :root { --bg-color: #fcfaf2; --card-bg: white; --text-color: #1f2937; }
         body.dark-mode { --bg-color: #0a0a0a; --card-bg: #1a1a1a; --text-color: #f3f4f6; }
         body { background-color: var(--bg-color); color: var(--text-color); transition: all 0.3s ease; }
 
-        /* Gaya Khusus Admin (Tulisan Hitam di Light Mode) */
+        /* Gaya Khusus Admin */
         .admin-text { color: #000000 !important; font-weight: 900; }
         body.dark-mode .admin-text { color: #f1d382 !important; }
 
@@ -85,7 +85,7 @@
     </div>
 
     <script>
-        // Logika Notifikasi Toast Custom
+        // Logika Notifikasi
         function showNotify(msg, type = 'error') {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
@@ -101,7 +101,7 @@
             }, 3000);
         }
 
-        // Dark Mode Logic
+        // Dark Mode
         function toggleDarkMode() {
             const body = document.body; const btn = document.getElementById('theme-toggle');
             body.classList.toggle('dark-mode');
@@ -114,7 +114,6 @@
         const roleTarget = params.get('role') || 'user';
 
         window.onload = () => {
-            // Load Saved Theme
             if(localStorage.getItem('theme') === 'dark') toggleDarkMode();
 
             const userFields = document.getElementById('user-fields');
@@ -122,7 +121,6 @@
             const subtitle = document.getElementById('reg-subtitle');
             const backLink = document.getElementById('back-link');
 
-            // Penyesuaian UI Berdasarkan Role
             if (roleTarget === 'admin') {
                 userFields.classList.add('hidden');
                 title.innerHTML = `<span class="admin-text">Admin</span> Registration`;
@@ -132,8 +130,6 @@
             } else {
                 title.classList.add('text-amber-600');
                 subtitle.innerText = "Portal Pendaftaran Member Mahasiswa";
-                backLink.href = "/";
-                backLink.innerText = "← Kembali ke Login Member";
             }
         };
 
@@ -141,29 +137,31 @@
             const username = document.getElementById('reg-user').value;
             const password = document.getElementById('reg-pass').value;
 
+            // Inisialisasi body sesuai ekspektasi Backend
             const body = {
                 username,
                 password,
-                role: roleTarget
+                role: roleTarget,
+                full_name: document.getElementById('reg-fullname').value,
+                email: document.getElementById('reg-email').value,
+                phone_number: document.getElementById('reg-phone').value // PERBAIKAN: Gunakan phone_number
             };
 
-            // Validasi Sederhana
             if(!username || !password) return showNotify("Username dan Password wajib diisi!");
 
+            // Validasi data profil untuk User
             if (roleTarget === 'user') {
-                body.full_name = document.getElementById('reg-fullname').value;
-                body.email = document.getElementById('reg-email').value;
-                body.phone_number = document.getElementById('reg-phone').value;
-                
-                if(!body.full_name || !body.email) return showNotify("Data diri wajib diisi lengkap untuk Member!");
+                if(!body.full_name || !body.email || !body.phone_number) {
+                    return showNotify("Data diri wajib diisi lengkap untuk Member!");
+                }
             }
 
-            // Memanggil API (Fungsi callAPI diasumsikan ada di /js/api.js)
             try {
+                // AUTH_URL harus terdefinisi di api.js
                 const { status, data } = await callAPI(`${AUTH_URL}/register`, 'POST', body);
                 
                 if (status === 201 || status === 200) {
-                    showNotify("Pendaftaran Berhasil!", "success");
+                    showNotify("Pendaftaran Berhasil! Silakan Login.", "success");
                     setTimeout(() => {
                         window.location.href = (roleTarget === 'admin') ? '/admin' : '/';
                     }, 1500);

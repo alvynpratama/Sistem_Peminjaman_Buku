@@ -1,6 +1,6 @@
 const express = require('express');
 const mysql = require('mysql2');
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcryptjs'); // Wajib bcryptjs untuk Azure
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
 
@@ -36,21 +36,24 @@ const authenticate = (req, res, next) => {
     });
 };
 
-// --- REGISTER (Fix Email NULL) ---
+// --- REGISTER (Fix Email NULL & Duplicate Error) ---
 app.post('/register', async (req, res) => {
     const { username, password, role, full_name, email, phone_number } = req.body;
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
         const query = 'INSERT INTO users (username, password, role, full_name, email, phone_number) VALUES (?, ?, ?, ?, ?, ?)';
-        // Menggunakan || '' agar email di database tidak NULL
+        // Menggunakan || '' agar tidak NULL di database
         db.query(query, [username, hashedPassword, role || 'user', full_name || '', email || '', phone_number || ''], (err) => {
-            if (err) return res.status(err.code === 'ER_DUP_ENTRY' ? 400 : 500).json({ message: err.message });
+            if (err) {
+                if (err.code === 'ER_DUP_ENTRY') return res.status(400).json({ message: "Username sudah terdaftar!" });
+                return res.status(500).json({ error: err.message });
+            }
             res.status(201).json({ message: "Registrasi Berhasil!" });
         });
-    } catch (e) { res.status(500).json({ message: "Error" }); }
+    } catch (e) { res.status(500).json({ message: "Server Error" }); }
 });
 
-// --- LOGIN ---
+// --- LOGIN (Kirim phone_number) ---
 app.post('/login', (req, res) => {
     const { username, password } = req.body;
     db.query('SELECT * FROM users WHERE username = ?', [username], async (err, results) => {
@@ -60,12 +63,12 @@ app.post('/login', (req, res) => {
         if (!match) return res.status(401).json({ message: "Password salah" });
         
         const token = jwt.sign({ id: user.id, role: user.role, name: user.full_name || user.username }, JWT_SECRET, { expiresIn: '1d' });
-        // Mengirim phone_number agar tampil di UI
+        // Mengembalikan phone_number untuk UI
         res.json({ token, role: user.role, name: user.full_name || user.username, username: user.username, email: user.email, phone_number: user.phone_number });
     });
 });
 
-// --- PROFILE & UPDATE (Fix Email NULL saat simpan) ---
+// --- PROFILE & UPDATE (Cegah Email NULL saat Update) ---
 app.get('/profile', authenticate, (req, res) => {
     db.query('SELECT id, username, full_name, email, phone_number, role FROM users WHERE id = ?', [req.user.id], (err, results) => {
         if (err || results.length === 0) return res.status(404).json({ message: "User tidak ditemukan" });
@@ -75,7 +78,6 @@ app.get('/profile', authenticate, (req, res) => {
 
 app.post('/profile/update', authenticate, (req, res) => {
     const { full_name, username, email, phone_number } = req.body;
-    // Email harus masuk di query UPDATE agar tidak jadi NULL
     const query = 'UPDATE users SET full_name = ?, username = ?, email = ?, phone_number = ? WHERE id = ?';
     db.query(query, [full_name || '', username, email || '', phone_number || '', req.user.id], (err) => {
         if (err) return res.status(500).json({ message: "Gagal simpan" });
@@ -83,4 +85,17 @@ app.post('/profile/update', authenticate, (req, res) => {
     });
 });
 
-app.listen(8080);
+app.post('/admin/login', (req, res) => {
+    const { username, password } = req.body;
+    db.query('SELECT * FROM users WHERE username = ? AND role = "admin"', [username], async (err, results) => {
+        if (err || results.length === 0) return res.status(401).json({ message: "Admin tidak ditemukan" });
+        const user = results[0];
+        const match = await bcrypt.compare(password, user.password);
+        if (!match) return res.status(401).json({ message: "Password salah" });
+        const token = jwt.sign({ id: user.id, role: user.role, name: user.full_name || user.username }, JWT_SECRET, { expiresIn: '1d' });
+        res.json({ token, role: user.role, name: user.full_name || user.username, username: user.username, email: user.email, phone_number: user.phone_number });
+    });
+});
+
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => console.log(`Auth Service Ready`));

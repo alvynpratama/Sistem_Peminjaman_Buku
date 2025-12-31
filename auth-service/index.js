@@ -7,14 +7,14 @@ const cors = require('cors');
 const app = express();
 app.use(express.json());
 
-// 1. KONFIGURASI CORS
+// 1. KONFIGURASI CORS - Mengizinkan akses dari domain Frontend
 app.use(cors({
     origin: 'https://peminjaman-buku-cxbrajbnh9cdemgu.koreacentral-01.azurewebsites.net',
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// 2. KONEKSI DATABASE
+// 2. KONEKSI DATABASE - Menggunakan SSL untuk Azure MySQL
 const db = mysql.createPool({
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
@@ -44,7 +44,7 @@ const authenticate = (req, res, next) => {
  * 3. ENDPOINTS
  */
 
-// LOGIN & REGISTER (Tetap sama)
+// REGISTER - Menyimpan data lengkap user
 app.post('/register', async (req, res) => {
     const { username, password, role, full_name, email, phone_number } = req.body;
     try {
@@ -54,18 +54,34 @@ app.post('/register', async (req, res) => {
             if (err) return res.status(500).json({ error: err.message });
             res.status(201).json({ message: "Registrasi Berhasil!" });
         });
-    } catch (e) { res.status(500).json({ message: "Error" }); }
+    } catch (e) { res.status(500).json({ message: "Gagal memproses data" }); }
 });
 
+// LOGIN - PERBAIKAN: Mengirim nama & username agar tidak muncul "Guest"
 app.post('/login', (req, res) => {
     const { username, password } = req.body;
     db.query('SELECT * FROM users WHERE username = ?', [username], async (err, results) => {
         if (err || results.length === 0) return res.status(401).json({ message: "Akun tidak ditemukan" });
+        
         const user = results[0];
         const match = await bcrypt.compare(password, user.password);
         if (!match) return res.status(401).json({ message: "Password salah" });
-        const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
-        res.json({ token, role: user.role });
+
+        // Sertakan nama dalam token
+        const displayName = user.full_name || user.username;
+        const token = jwt.sign(
+            { id: user.id, role: user.role, name: displayName }, 
+            JWT_SECRET, 
+            { expiresIn: '1d' }
+        );
+
+        // Kirim data lengkap ke frontend agar profil langsung terisi
+        res.json({ 
+            token, 
+            role: user.role, 
+            name: displayName,
+            username: user.username 
+        });
     });
 });
 
@@ -77,24 +93,17 @@ app.get('/profile', authenticate, (req, res) => {
     });
 });
 
-// --- PERBAIKAN: ENDPOINT UPDATE PROFIL (Untuk tombol Simpan) ---
+// UPDATE PROFIL
 app.post('/profile/update', authenticate, (req, res) => {
     const { full_name, username, email, phone_number } = req.body;
-    const userId = req.user.id;
+    const query = 'UPDATE users SET full_name = ?, username = ?, email = ?, phone_number = ? WHERE id = ?';
 
-    const query = `
-        UPDATE users 
-        SET full_name = ?, username = ?, email = ?, phone_number = ? 
-        WHERE id = ?`;
-
-    db.query(query, [full_name, username, email, phone_number, userId], (err, result) => {
-        if (err) {
-            console.error("Update Error:", err);
-            return res.status(500).json({ message: "Gagal memperbarui database", error: err.message });
-        }
+    db.query(query, [full_name, username, email, phone_number, req.user.id], (err) => {
+        if (err) return res.status(500).json({ message: "Gagal update", error: err.message });
         res.json({ message: "Profil berhasil diperbarui!" });
     });
 });
 
+// 4. LISTEN - Tanpa '0.0.0.0' untuk Azure Windows (Named Pipes)
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => console.log(`Auth Service Aktif di Port ${PORT}`));

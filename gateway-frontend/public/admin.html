@@ -115,7 +115,6 @@
          * FUNGSI UTILITIES (UI & State)
          */
 
-        // Notification Engine: Membuat elemen toast dinamis untuk feedback user
         function showNotify(msg, type = 'error') {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
@@ -126,7 +125,6 @@
             setTimeout(() => { toast.classList.remove('toast-active', 'translate-y-0'); toast.classList.add('opacity-0'); setTimeout(() => toast.remove(), 300); }, 3000);
         }
 
-        // Logic Modal Konfirmasi: Mengelola callback dinamis untuk aksi berbahaya (seperti delete)
         let confirmAction = null;
         function showCustomConfirm(msg, action, icon = '⚠️') {
             document.getElementById('confirm-msg').innerText = msg;
@@ -137,7 +135,6 @@
         function closeConfirm() { document.getElementById('confirm-modal').classList.add('hidden'); confirmAction = null; }
         document.getElementById('confirm-ok').onclick = () => { if(confirmAction) confirmAction(); closeConfirm(); };
 
-        // Theme Manager: Menyimpan preferensi tema di LocalStorage
         function toggleDarkMode() {
             const body = document.body; const btn = document.getElementById('theme-toggle');
             body.classList.toggle('dark-mode');
@@ -150,20 +147,17 @@
          * AUTENTIKASI & INITIALIZATION
          */
 
-        // Lifecycle Hook: Memeriksa token saat halaman dimuat
         window.onload = () => { 
             if(localStorage.getItem('theme') === 'dark') toggleDarkMode();
             const token = localStorage.getItem('admin_token');
             if (token) showDashboard(localStorage.getItem('admin_role'));
         };
 
-        // Auth Logic: Mengirim kredensial ke Auth Service
         async function handleLogin() {
             const u = document.getElementById('user').value;
             const p = document.getElementById('pass').value;
             if(!u || !p) return showNotify("Username dan Password tidak boleh kosong!");
             
-            // Komunikasi dengan endpoint login khusus Admin
             const { status, data } = await callAPI(`${AUTH_URL}/admin/login`, 'POST', { username: u, password: p }, 'admin');
             if (data && data.token) { 
                 localStorage.setItem('admin_token', data.token); 
@@ -186,18 +180,16 @@
          * CORE DASHBOARD LOGIC
          */
 
-        // Dashboard Init: Mengaktifkan polling data untuk sinkronisasi real-time
         function showDashboard(role) { 
             document.getElementById('auth-section').classList.add('hidden'); 
             document.getElementById('dashboard').classList.remove('hidden'); 
             document.getElementById('welcome').innerHTML = role.toUpperCase() === 'ADMIN' ? `<span class="admin-black">${role}</span>` : role; 
             refreshAdminData(); 
-            setInterval(refreshAdminData, 5000); // Polling setiap 5 detik
+            setInterval(refreshAdminData, 5000); 
         }
         
         function refreshAdminData() { if(!document.getElementById('dashboard').classList.contains('hidden')) { loadBooks(); loadMonitoring(); } }
         
-        // Navigation: Mengelola visibilitas antar modul dashboard
         function switchTab(tab) {
             const inv = document.getElementById('section-inventory'); const mon = document.getElementById('section-monitoring');
             const tInv = document.getElementById('tab-inv'); const tMon = document.getElementById('tab-mon');
@@ -209,7 +201,6 @@
          * CRUD & DATA FETCHING (INVENTORY)
          */
 
-        // GET: Mengambil data buku dari Main Service
         async function loadBooks() {
             const { data } = await callAPI(`${MAIN_URL}/books`, 'GET', null, 'admin');
             const list = document.getElementById('book-list');
@@ -217,21 +208,57 @@
             list.innerHTML = data.map(b => `<div class="card-3d p-6 rounded-3xl flex gap-6 items-center"><img src="${b.cover_url || 'https://via.placeholder.com/100x150'}" class="w-20 h-28 object-cover rounded-xl shadow-lg"><div class="flex-1 overflow-hidden text-left"><h4 class="font-black uppercase text-lg truncate tracking-tighter">${b.title}</h4><p class="text-amber-500 text-xs font-bold mb-2 tracking-widest">${b.author}</p><div class="flex gap-2"><span class="text-[9px] bg-amber-500/10 px-2 py-1 rounded-md border border-amber-500/20 uppercase font-black text-amber-600">${b.genre}</span><span class="text-[9px] opacity-60 font-bold uppercase mt-1 italic">Stok: ${b.stock}</span></div><div class="mt-4 flex gap-2 pb-4"><button onclick='editBook(${JSON.stringify(b)})' class="px-6 py-2 gold-gradient text-white text-[10px] font-black rounded-lg btn-3d tracking-widest uppercase">Edit</button><button onclick="deleteBook(${b.id})" class="px-6 py-2 bg-red-500/10 text-red-500 text-[10px] font-black rounded-lg border border-red-500/20 uppercase">Hapus</button></div></div></div>`).join('');
         }
 
-        // POST/PUT: Menambah atau memperbarui data buku
+        // POST/PUT: Menambah atau memperbarui data buku (FIXED LOGIC)
         async function addBook() {
-            const t = document.getElementById('title').value; const a = document.getElementById('author').value; const y = document.getElementById('year').value; const g = document.getElementById('genre').value; const c = document.getElementById('cover_url').value; const s = document.getElementById('stock').value;
+            const id = document.getElementById('book-id').value; // Ambil ID dari hidden input
+            const t = document.getElementById('title').value; 
+            const a = document.getElementById('author').value; 
+            const y = document.getElementById('year').value; 
+            const g = document.getElementById('genre').value; 
+            const c = document.getElementById('cover_url').value; 
+            const s = document.getElementById('stock').value;
+
             if(!t || !a || !y || !g || !c || !s) return showNotify("Semua field buku wajib diisi!");
-            const body = { id: document.getElementById('book-id').value || null, title: t, author: a, year: y, genre: g, cover_url: c, stock: s };
-            const { status } = await callAPI(`${MAIN_URL}/books`, 'POST', body, 'admin');
-            if (status === 201 || status === 200) { showNotify("Data berhasil disimpan!", "success"); refreshAdminData(); resetForm(); }
+            
+            const body = { title: t, author: a, year: y, genre: g, cover_url: c, stock: s };
+            
+            // TENTUKAN URL & METHOD: Jika ada ID maka PUT (Update), jika tidak maka POST (Tambah)
+            const url = id ? `${MAIN_URL}/books/${id}` : `${MAIN_URL}/books`;
+            const method = id ? 'PUT' : 'POST';
+
+            const { status } = await callAPI(url, method, body, 'admin');
+            
+            if (status === 201 || status === 200) { 
+                showNotify(id ? "Data buku diperbarui!" : "Buku baru ditambahkan!", "success"); 
+                refreshAdminData(); 
+                resetForm(); 
+            } else {
+                showNotify("Gagal menyimpan ke database.");
+            }
         }
 
-        // Edit Mode: Memasukkan data buku ke form untuk diperbarui
-        function editBook(b) { document.getElementById('book-id').value = b.id; document.getElementById('title').value = b.title; document.getElementById('author').value = b.author; document.getElementById('year').value = b.year; document.getElementById('genre').value = b.genre; document.getElementById('cover_url').value = b.cover_url; document.getElementById('stock').value = b.stock; document.getElementById('form-title').innerHTML = '<span class="gold-gradient text-white w-10 h-10 flex items-center justify-center rounded-lg">✏️</span> Edit Data Buku'; document.getElementById('btn-save').innerText = 'UPDATE PERUBAHAN'; document.getElementById('btn-cancel').classList.remove('hidden'); window.scrollTo({top: 0, behavior: 'smooth'}); }
+        function editBook(b) { 
+            document.getElementById('book-id').value = b.id; 
+            document.getElementById('title').value = b.title; 
+            document.getElementById('author').value = b.author; 
+            document.getElementById('year').value = b.year; 
+            document.getElementById('genre').value = b.genre; 
+            document.getElementById('cover_url').value = b.cover_url; 
+            document.getElementById('stock').value = b.stock; 
+            document.getElementById('form-title').innerHTML = '<span class="gold-gradient text-white w-10 h-10 flex items-center justify-center rounded-lg">✏️</span> Edit Data Buku'; 
+            document.getElementById('btn-save').innerText = 'UPDATE PERUBAHAN'; 
+            document.getElementById('btn-cancel').classList.remove('hidden'); 
+            window.scrollTo({top: 0, behavior: 'smooth'}); 
+        }
         
-        function resetForm() { document.getElementById('book-id').value = ''; document.querySelectorAll('input').forEach(i => i.value = ''); document.getElementById('form-title').innerHTML = '<span class="gold-gradient text-white w-10 h-10 flex items-center justify-center rounded-lg">✚</span> Tambah Koleksi Buku Baru'; document.getElementById('btn-save').innerText = 'SIMPAN KE DATABASE'; document.getElementById('btn-cancel').classList.add('hidden'); }
+        function resetForm() { 
+            document.getElementById('book-id').value = ''; 
+            document.querySelectorAll('#section-inventory input').forEach(i => i.value = ''); 
+            document.getElementById('form-title').innerHTML = '<span class="gold-gradient text-white w-10 h-10 flex items-center justify-center rounded-lg">✚</span> Tambah Koleksi Buku Baru'; 
+            document.getElementById('btn-save').innerText = 'SIMPAN KE DATABASE'; 
+            document.getElementById('btn-cancel').classList.add('hidden'); 
+        }
         
-        // DELETE: Menghapus data buku (memerlukan konfirmasi)
         async function deleteBook(id) { 
             showCustomConfirm("Hapus buku ini secara permanen?", async () => { 
                 await callAPI(`${MAIN_URL}/books/${id}`, 'DELETE', null, 'admin'); 
@@ -244,7 +271,6 @@
          * MONITORING LOGIC
          */
 
-        // GET: Mengambil riwayat peminjaman dari Main Service untuk dipantau Admin
         async function loadMonitoring() {
             const { data } = await callAPI(`${MAIN_URL}/borrowings/all`, 'GET', null, 'admin');
             const list = document.getElementById('monitoring-list');

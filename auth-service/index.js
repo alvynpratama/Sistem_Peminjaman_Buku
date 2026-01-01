@@ -1,130 +1,232 @@
-const express = require('express');
-const mysql = require('mysql2');
-const bcrypt = require('bcryptjs'); 
-const jwt = require('jsonwebtoken');
-const cors = require('cors');
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Member Dashboard - Library Cloud</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    
+    <style>
+        :root { --bg-color: #fcfaf2; --card-bg: white; --text-color: #1f2937; --sub-text: #4b5563; }
+        body.dark-mode { --bg-color: #0a0a0a; --card-bg: rgba(255,255,255,0.05); --text-color: #f3f4f6; --sub-text: #9ca3af; }
+        body { background-color: var(--bg-color); color: var(--text-color); transition: all 0.3s ease; }
+        .gold-gradient { background: linear-gradient(135deg, #d4af37, #f1d382, #b8860b); }
+        .gold-border { border: 2px solid #d4af37; }
+        .card-3d { background: var(--card-bg); border: 1px solid rgba(212, 175, 55, 0.2); backdrop-filter: blur(10px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); transition: all 0.3s ease; }
+        .card-3d:hover { transform: translateY(-5px); border-color: #d4af37; box-shadow: 0 15px 30px rgba(212, 175, 55, 0.3); }
+        .btn-3d { position: relative; transition: all 0.1s ease; box-shadow: 0 4px 0 #996515; border: none; top: 0; }
+        .btn-3d:active { transform: translateY(3px); box-shadow: 0 1px 0 #996515; }
+        .theme-fixed { position: fixed; top: 1.5rem; left: 1.5rem; z-index: 50; }
+        #sidebar-history { transition: transform 0.4s ease; background: var(--card-bg); backdrop-filter: blur(20px); border-left: 4px solid #d4af37; z-index: 100; }
+        .sidebar-hidden { transform: translateX(100%); }
+        input { background: var(--card-bg) !important; color: var(--text-color) !important; border: 1px solid rgba(212, 175, 55, 0.3) !important; }
+        .toast-active { transform: translateY(0); opacity: 1; }
+    </style>
+</head>
+<body class="min-h-screen overflow-x-hidden">
+    <div id="toast-container" class="fixed bottom-5 right-5 z-[200] flex flex-col gap-2"></div>
 
-const app = express();
-app.use(express.json());
+    <div id="confirm-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 z-[210]">
+        <div class="card-3d p-8 rounded-[2.5rem] w-full max-w-sm border-t-8 border-amber-500 text-center">
+            <div id="confirm-icon" class="text-4xl mb-4">⚠️</div>
+            <h3 id="confirm-msg" class="text-lg font-bold mb-6 italic uppercase tracking-tighter text-amber-600">Apakah Anda yakin?</h3>
+            <div class="flex gap-3">
+                <button id="confirm-ok" class="flex-1 gold-gradient text-white py-3 rounded-xl font-black btn-3d uppercase text-xs">Ya, Lanjutkan</button>
+                <button onclick="closeConfirm()" class="flex-1 bg-gray-500/10 text-gray-500 py-3 rounded-xl font-bold text-xs uppercase border border-gray-300">Batal</button>
+            </div>
+        </div>
+    </div>
 
-// 1. KONFIGURASI CORS
-app.use(cors({
-    origin: 'https://peminjaman-buku-cxbrajbnh9cdemgu.koreacentral-01.azurewebsites.net',
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
+    <div id="sidebar-history" class="fixed top-0 right-0 h-full w-full md:w-96 sidebar-hidden p-6 overflow-y-auto">
+        <div class="flex justify-between items-center mb-8 pb-4 border-b border-amber-500/20">
+            <h3 class="font-black text-2xl text-amber-600 uppercase italic text-center">Riwayat Saya</h3>
+            <button onclick="toggleSidebar()" class="w-10 h-10 flex items-center justify-center rounded-full bg-amber-500/10 text-amber-500 font-bold">&times;</button>
+        </div>
+        <div id="history-list" class="space-y-4"></div>
+    </div>
 
-// 2. KONEKSI DATABASE (SSL Aktif untuk Azure)
-const db = mysql.createPool({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER || 'taufiq',
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME || 'auth_db',
-    port: 3306,
-    ssl: { rejectUnauthorized: false },
-    waitForConnections: true,
-    connectionLimit: 10
-});
+    <div id="app" class="max-w-7xl mx-auto p-4 md:p-8">
+        <div class="theme-fixed">
+            <button onclick="toggleDarkMode()" class="p-4 rounded-full card-3d text-2xl shadow-2xl border-2 border-amber-500/30" id="theme-toggle">🌙</button>
+        </div>
 
-const JWT_SECRET = process.env.JWT_SECRET || 'secret_kunci_dosen';
+        <div id="auth-section" class="max-w-md mx-auto card-3d p-10 rounded-[2.5rem] mt-10 text-center border-t-8 border-amber-500">
+            <h1 class="text-3xl font-black mb-2 text-amber-600 italic uppercase">Library Cloud</h1>
+            <p class="text-[10px] tracking-[0.3em] uppercase mb-8 font-bold opacity-60">Akses Anggota Eksklusif</p>
+            <div class="space-y-4">
+                <input id="user" type="text" placeholder="Username Anda" class="w-full p-4 rounded-xl outline-none text-center border-none">
+                <input id="pass" type="password" placeholder="Password" class="w-full p-4 rounded-xl outline-none text-center border-none">
+                <button onclick="handleLogin()" class="w-full gold-gradient text-white font-black py-4 rounded-xl btn-3d tracking-widest uppercase">MASUK</button>
+                <p class="text-sm opacity-70">Belum punya akun? <a href="/register?role=user" class="text-amber-600 font-bold hover:underline">Daftar Sekarang</a></p>
+            </div>
+        </div>
 
-// Middleware Otentikasi
-const authenticate = (req, res, next) => {
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) return res.status(401).json({ message: "Sesi habis" });
-    jwt.verify(token, JWT_SECRET, (err, decoded) => {
-        if (err) return res.status(403).json({ message: "Token tidak valid" });
-        req.user = decoded;
-        next();
-    });
-};
+        <div id="dashboard" class="hidden">
+            <div class="flex flex-col md:flex-row justify-between items-center mb-12 card-3d p-8 rounded-[2rem] gap-6 border-b-4 border-amber-500">
+                <div class="text-center md:text-left">
+                    <p class="text-xs text-amber-600 font-black uppercase tracking-widest mb-1">Selamat Datang,</p>
+                    <h2 id="welcome" class="text-3xl font-black italic uppercase tracking-tighter"></h2>
+                </div>
+                <div class="flex flex-wrap justify-center gap-3">
+                    <button onclick="toggleSidebar()" class="px-6 py-3 gold-gradient text-white rounded-xl font-bold btn-3d flex items-center gap-2 uppercase tracking-widest text-xs"><span>🕒</span> RIWAYAT</button>
+                    <button onclick="toggleProfile()" class="px-6 py-3 card-3d text-amber-600 rounded-xl font-bold border-2 border-amber-500/30 text-xs tracking-widest uppercase">Profil</button>
+                    <button onclick="confirmLogout()" class="px-6 py-3 bg-red-600 text-white rounded-xl font-bold btn-3d text-xs tracking-widest uppercase" style="box-shadow: 0 4px 0 #7f1d1d;">Logout</button>
+                </div>
+            </div>
+            <h3 class="font-black text-2xl mb-8 text-amber-600 uppercase tracking-tight flex items-center gap-3 italic"><span class="w-2 h-8 gold-gradient rounded-full"></span>Katalog Koleksi Perpustakaan</h3>
+            <div id="book-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"></div>
+        </div>
+    </div>
 
-/**
- * 3. ENDPOINTS
- */
+    <div id="profile-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 z-[170]">
+        <div class="card-3d p-10 rounded-[2.5rem] w-full max-w-md border-t-8 border-amber-500">
+            <h3 class="font-black text-2xl mb-6 text-amber-600 uppercase italic">Pengaturan Akun</h3>
+            <div class="space-y-4">
+                <div class="space-y-1"><label class="text-[9px] font-black uppercase opacity-60 ml-1">Nama Lengkap</label><input id="prof-name" class="w-full p-3 rounded-xl outline-none focus:border-amber-500"></div>
+                <div class="space-y-1"><label class="text-[9px] font-black uppercase opacity-60 ml-1">Username</label><input id="prof-user" class="w-full p-3 rounded-xl outline-none focus:border-amber-500"></div>
+                <div class="space-y-1"><label class="text-[9px] font-black uppercase opacity-60 ml-1">Email Address</label><input id="prof-email" class="w-full p-3 rounded-xl opacity-40 cursor-not-allowed" readonly></div>
+                <div class="space-y-1"><label class="text-[9px] font-black uppercase opacity-60 ml-1">Nomor Telepon</label><input id="prof-phone" class="w-full p-3 rounded-xl outline-none focus:border-amber-500"></div>
+            </div>
+            <div class="mt-8 flex gap-3 pb-4">
+                <button onclick="saveProfile()" class="flex-1 gold-gradient text-white py-4 rounded-xl font-black btn-3d tracking-widest uppercase">Simpan</button>
+                <button onclick="toggleProfile()" class="flex-1 bg-amber-500/10 text-amber-600 py-4 rounded-xl font-bold text-xs uppercase">Batal</button>
+            </div>
+        </div>
+    </div>
 
-// --- REGISTER (Fix Email NULL & Duplicate Error) ---
-app.post('/register', async (req, res) => {
-    const { username, password, role, full_name, email, phone_number } = req.body;
-    try {
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const query = 'INSERT INTO users (username, password, role, full_name, email, phone_number) VALUES (?, ?, ?, ?, ?, ?)';
+    <script>
+        function showNotify(msg, type = 'error') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `px-6 py-3 rounded-xl shadow-2xl border-l-8 font-bold transition-all duration-300 transform translate-y-10 opacity-0 ${type === 'error' ? 'bg-red-50 text-red-700 border-red-500' : 'bg-green-50 text-green-700 border-green-500'}`;
+            toast.innerText = msg;
+            container.appendChild(toast);
+            setTimeout(() => { toast.classList.add('toast-active', 'translate-y-0'); toast.classList.remove('opacity-0'); }, 10);
+            setTimeout(() => { toast.classList.remove('toast-active', 'translate-y-0'); toast.classList.add('opacity-0'); setTimeout(() => toast.remove(), 300); }, 3000);
+        }
+
+        let confirmAction = null;
+        function showCustomConfirm(msg, action, icon = '⚠️') {
+            document.getElementById('confirm-msg').innerText = msg;
+            document.getElementById('confirm-icon').innerText = icon;
+            document.getElementById('confirm-modal').classList.remove('hidden');
+            confirmAction = action;
+        }
+        function closeConfirm() { document.getElementById('confirm-modal').classList.add('hidden'); confirmAction = null; }
+        document.getElementById('confirm-ok').onclick = () => { if(confirmAction) confirmAction(); closeConfirm(); };
+
+        function toggleDarkMode() {
+            const body = document.body; const btn = document.getElementById('theme-toggle');
+            body.classList.toggle('dark-mode');
+            const isDark = body.classList.contains('dark-mode');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            btn.innerText = isDark ? '☀️' : '🌙';
+        }
         
-        // Gunakan || '' agar data tidak NULL di database
-        db.query(query, [username, hashedPassword, role || 'user', full_name || '', email || '', phone_number || ''], (err) => {
-            if (err) {
-                if (err.code === 'ER_DUP_ENTRY') return res.status(400).json({ message: "Username atau Email sudah terdaftar!" });
-                return res.status(500).json({ error: err.message });
-            }
-            res.status(201).json({ message: "Registrasi Berhasil!" });
-        });
-    } catch (e) { res.status(500).json({ message: "Server Error" }); }
-});
-
-// --- LOGIN (Kirim semua data profil) ---
-const loginHandler = (req, res, expectedRole) => {
-    const { username, password } = req.body;
-    db.query('SELECT * FROM users WHERE username = ?', [username], async (err, results) => {
-        if (err || results.length === 0) return res.status(401).json({ message: "User tidak ditemukan" });
-        const user = results[0];
-
-        if (expectedRole && user.role !== expectedRole) return res.status(403).json({ message: "Akses ditolak!" });
-
-        const match = await bcrypt.compare(password, user.password);
-        if (!match) return res.status(401).json({ message: "Password salah" });
+        window.onload = () => { 
+            if(localStorage.getItem('theme') === 'dark') toggleDarkMode(); 
+            const token = localStorage.getItem('user_token'); 
+            if (token) showDashboard(localStorage.getItem('user_role')); 
+        };
         
-        const token = jwt.sign({ id: user.id, role: user.role, name: user.full_name || user.username }, JWT_SECRET, { expiresIn: '1d' });
+        function toggleSidebar() { document.getElementById('sidebar-history').classList.toggle('sidebar-hidden'); }
+
+        /* Authentication Logic - FIXED: data.phone_number mapping */
+        async function handleLogin() {
+            const u = document.getElementById('user').value; const p = document.getElementById('pass').value;
+            if(!u || !p) return showNotify("Username dan Password wajib diisi!");
+            const { status, data } = await callAPI(`${AUTH_URL}/login`, 'POST', { username: u, password: p }, 'user');
+            if (data && data.token) { 
+                localStorage.setItem('user_token', data.token); 
+                localStorage.setItem('user_role', data.role); 
+                localStorage.setItem('user_full_name', data.name || ''); 
+                localStorage.setItem('user_username', data.username || ''); 
+                localStorage.setItem('user_email', data.email || ''); 
+                localStorage.setItem('user_phone', data.phone_number || ''); // Sinkron dengan DB
+                location.reload(); 
+            } 
+            else { showNotify("Login Gagal! Akun tidak ditemukan."); }
+        }
+
+        /* LOGOUT LOGIC - FIXED: Sesuai struktur popup sebelumnya */
+        function confirmLogout() { 
+            showCustomConfirm("Yakin ingin mengakhiri sesi?", () => logout(), '🚪'); 
+        }
         
-        // Mengirim data lengkap agar bisa disimpan di localStorage frontend
-        res.json({ 
-            token, 
-            role: user.role, 
-            name: user.full_name || user.username, 
-            username: user.username, 
-            email: user.email || '', 
-            phone_number: user.phone_number || '' 
-        });
-    });
-};
-
-app.post('/login', (req, res) => loginHandler(req, res, 'user'));
-app.post('/admin/login', (req, res) => loginHandler(req, res, 'admin'));
-
-// --- PROFILE (Ambil data terbaru) ---
-app.get('/profile', authenticate, (req, res) => {
-    db.query('SELECT id, username, full_name, email, phone_number, role FROM users WHERE id = ?', [req.user.id], (err, results) => {
-        if (err || results.length === 0) return res.status(404).json({ message: "User tidak ditemukan" });
-        res.json(results[0]);
-    });
-});
-
-// --- UPDATE PROFILE (FIX: Logika Anti-Overwriting) ---
-app.post('/profile/update', authenticate, (req, res) => {
-    const { full_name, username, email, phone_number } = req.body;
-
-    // Ambil data lama terlebih dahulu
-    db.query('SELECT * FROM users WHERE id = ?', [req.user.id], (err, results) => {
-        if (err || results.length === 0) return res.status(404).json({ message: "User tidak ditemukan" });
+        function logout() {
+            localStorage.clear(); // Bersihkan semua sesi
+            location.reload(); 
+        }
         
-        const currentData = results[0];
-
-        // Jika data baru tidak dikirim (kosong/null), gunakan data lama agar tidak terhapus
-        const final_full_name = full_name || currentData.full_name;
-        const final_username = username || currentData.username;
-        const final_email = email || currentData.email;
-        const final_phone = phone_number || currentData.phone_number;
-
-        const query = 'UPDATE users SET full_name = ?, username = ?, email = ?, phone_number = ? WHERE id = ?';
+        function showDashboard(role) { 
+            document.getElementById('auth-section').classList.add('hidden'); 
+            document.getElementById('dashboard').classList.remove('hidden'); 
+            document.getElementById('welcome').innerText = localStorage.getItem('user_full_name') || 'Guest'; 
+            refreshUserData(); 
+            setInterval(refreshUserData, 5000); 
+        }
         
-        db.query(query, [final_full_name, final_username, final_email, final_phone, req.user.id], (err) => {
-            if (err) {
-                if (err.code === 'ER_DUP_ENTRY') return res.status(400).json({ message: "Username sudah digunakan!" });
-                return res.status(500).json({ message: "Gagal simpan ke database" });
-            }
-            res.json({ message: "Profil berhasil diperbarui!" });
-        });
-    });
-});
+        function refreshUserData() { 
+            if(!document.getElementById('dashboard').classList.contains('hidden')) { loadBooks(); loadHistory(); } 
+        }
 
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => console.log(`Auth Service Ready on Port ${PORT}`));
+        async function loadBooks() {
+            const { data } = await callAPI(`${MAIN_URL}/books`, 'GET', null, 'user');
+            const list = document.getElementById('book-list'); if(!data) return;
+            list.innerHTML = data.map(b => `<div class="card-3d p-6 rounded-[2rem] flex flex-col gap-4 ${!b.stock > 0 ? 'opacity-50 grayscale' : ''}"><div class="relative overflow-hidden rounded-2xl"><img src="${b.cover_url || 'https://via.placeholder.com/300x450'}" class="w-full h-72 object-cover transition-transform hover:scale-110 duration-500"><div class="absolute top-3 left-3 gold-gradient text-white px-3 py-1 rounded-full font-black text-[10px] shadow-lg">${b.year || '-'}</div></div><div class="flex-1"><h4 class="text-xl font-black leading-tight truncate uppercase tracking-tighter">${b.title}</h4><p class="text-amber-500 font-bold text-sm mb-3 tracking-widest">${b.author}</p><span class="bg-amber-500/10 text-amber-600 text-[10px] px-3 py-1 rounded-full font-black border border-amber-500/20 uppercase italic">${b.genre}</span></div><div class="flex justify-between items-center pt-4 border-t border-dashed border-amber-500/20 pb-4"><div class="flex flex-col"><span class="${b.stock > 0 ? 'text-green-500' : 'text-red-500'} text-[10px] font-black uppercase tracking-widest">${b.stock > 0 ? '● Tersedia' : '● Habis'}</span><span class="text-xs opacity-50 font-bold italic">Unit: ${b.stock}</span></div><button onclick="${b.stock > 0 ? `borrowBook(${b.id})` : ''}" class="px-8 py-3 rounded-xl font-black text-xs btn-3d ${b.stock > 0 ? 'gold-gradient text-white' : 'bg-gray-500 text-white shadow-none'} uppercase tracking-widest">PINJAM</button></div></div>`).join('');
+        }
+
+        async function loadHistory() {
+            const { data } = await callAPI(`${MAIN_URL}/borrowings/all`, 'GET', null, 'user');
+            const historyDiv = document.getElementById('history-list'); if (!data || data.length === 0) { historyDiv.innerHTML = '<p class="text-center py-10 opacity-50 italic text-sm">Belum ada riwayat</p>'; return; }
+            historyDiv.innerHTML = data.map(h => `<div class="card-3d p-4 rounded-2xl border-l-4 ${h.return_date ? 'border-green-500' : 'border-amber-500'} flex gap-4 items-center border border-gray-100/10"><img src="${h.cover_url || 'https://via.placeholder.com/50x75'}" class="w-14 h-20 object-cover rounded-xl shadow-lg"><div class="flex-1 overflow-hidden"><p class="font-black text-xs truncate uppercase tracking-tighter">${h.title}</p><p class="text-[9px] opacity-60 font-bold uppercase mt-1 tracking-widest">Out: ${h.borrow_date.replace('T', ' ').slice(0, 16)}</p>${h.return_date ? `<p class="text-[9px] text-green-500 font-bold uppercase mt-0.5 tracking-widest italic">In: ${h.return_date.replace('T', ' ').slice(0, 16)}</p>` : ''}<div class="mt-3 pb-4">${!h.return_date ? `<button onclick="confirmReturn(${h.id})" class="mt-3 w-full gold-gradient text-white py-3 rounded-xl text-[9px] font-black btn-3d uppercase tracking-widest">KEMBALIKAN</button>` : '<div class="mt-2 text-[9px] font-black text-green-600 uppercase italic tracking-widest pt-1 border-t border-gray-100/10 text-center">Returned</div>'}</div></div></div>`).join('');
+        }
+
+        function confirmReturn(id) { showCustomConfirm("Kembalikan buku ini sekarang?", () => returnBook(id), '📚'); }
+        
+        function toggleProfile() { 
+            document.getElementById('profile-modal').classList.toggle('hidden'); 
+            if(!document.getElementById('profile-modal').classList.contains('hidden')) { 
+                document.getElementById('prof-name').value = localStorage.getItem('user_full_name') || ''; 
+                document.getElementById('prof-user').value = localStorage.getItem('user_username') || ''; 
+                document.getElementById('prof-email').value = localStorage.getItem('user_email') || ''; 
+                document.getElementById('prof-phone').value = localStorage.getItem('user_phone') || ''; 
+            } 
+        }
+
+        async function saveProfile() { 
+            const n = document.getElementById('prof-name').value; 
+            const u = document.getElementById('prof-user').value; 
+            const e = document.getElementById('prof-email').value; // Ambil email agar tidak hilang
+            const p = document.getElementById('prof-phone').value; 
+            
+            if(!n || !u || !p) return showNotify("Semua data profil wajib diisi!"); 
+            
+            const body = { full_name: n, username: u, email: e, phone_number: p }; 
+            const { status } = await callAPI(`${AUTH_URL}/profile/update`, 'POST', body, 'user'); 
+            if(status === 200) { 
+                localStorage.setItem('user_full_name', body.full_name); 
+                localStorage.setItem('user_username', body.username); 
+                localStorage.setItem('user_phone', body.phone_number); 
+                showNotify("Profil Berhasil Diperbarui!", "success"); 
+                setTimeout(() => location.reload(), 1000); 
+            } 
+        }
+
+        async function borrowBook(id) { 
+            const body = { book_id: id, borrower_name: localStorage.getItem('user_full_name'), borrower_phone: localStorage.getItem('user_phone') }; 
+            const { data } = await callAPI(`${MAIN_URL}/borrow`, 'POST', body, 'user'); 
+            showNotify(data.message, "success"); 
+            refreshUserData(); 
+        }
+
+        async function returnBook(id) { 
+            const { data } = await callAPI(`${MAIN_URL}/return`, 'POST', { borrowing_id: id }, 'user'); 
+            showNotify(data.message, "success"); 
+            refreshUserData(); 
+        }
+    </script>
+</body>
+</html>

@@ -9,23 +9,15 @@
     <script src="/js/auth.js"></script>
     
     <style>
-        /* CSS Variables: Memudahkan manajemen warna untuk Light/Dark Mode */
         :root { --bg-color: #fcfaf2; --card-bg: white; --text-color: #1f2937; --sub-text: #4b5563; }
         body.dark-mode { --bg-color: #0a0a0a; --card-bg: rgba(255,255,255,0.05); --text-color: #f3f4f6; --sub-text: #9ca3af; }
-        
         body { background-color: var(--bg-color); color: var(--text-color); transition: all 0.3s ease; }
-        
-        /* Premium UI Elements: Gradasi Emas & Efek 3D */
         .gold-gradient { background: linear-gradient(135deg, #d4af37, #f1d382, #b8860b); }
         .gold-border { border: 2px solid #d4af37; }
         .card-3d { background: var(--card-bg); border: 1px solid rgba(212, 175, 55, 0.2); backdrop-filter: blur(10px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); transition: all 0.3s ease; }
         .card-3d:hover { transform: translateY(-5px); border-color: #d4af37; box-shadow: 0 15px 30px rgba(212, 175, 55, 0.3); }
-        
-        /* Interactive Elements: Feedback visual saat tombol ditekan */
         .btn-3d { position: relative; transition: all 0.1s ease; box-shadow: 0 4px 0 #996515; border: none; top: 0; }
         .btn-3d:active { transform: translateY(3px); box-shadow: 0 1px 0 #996515; }
-        
-        /* Navigation & Overlays */
         .theme-fixed { position: fixed; top: 1.5rem; left: 1.5rem; z-index: 50; }
         #sidebar-history { transition: transform 0.4s ease; background: var(--card-bg); backdrop-filter: blur(20px); border-left: 4px solid #d4af37; z-index: 100; }
         .sidebar-hidden { transform: translateX(100%); }
@@ -37,7 +29,7 @@
     <div id="toast-container" class="fixed bottom-5 right-5 z-[200] flex flex-col gap-2"></div>
 
     <div id="confirm-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 z-[210]">
-        <div class="card-3d p-8 rounded-[2.5rem] w-full max-sm border-t-8 border-amber-500 text-center">
+        <div class="card-3d p-8 rounded-[2.5rem] w-full max-w-sm border-t-8 border-amber-500 text-center">
             <div id="confirm-icon" class="text-4xl mb-4">⚠️</div>
             <h3 id="confirm-msg" class="text-lg font-bold mb-6 italic uppercase tracking-tighter text-amber-600">Apakah Anda yakin?</h3>
             <div class="flex gap-3">
@@ -105,7 +97,6 @@
     </div>
 
     <script>
-        /* Utility: Sistem Notifikasi Toast */
         function showNotify(msg, type = 'error') {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
@@ -116,7 +107,6 @@
             setTimeout(() => { toast.classList.remove('toast-active', 'translate-y-0'); toast.classList.add('opacity-0'); setTimeout(() => toast.remove(), 300); }, 3000);
         }
 
-        /* Utility: Custom Confirmation Logic */
         let confirmAction = null;
         function showCustomConfirm(msg, action, icon = '⚠️') {
             document.getElementById('confirm-msg').innerText = msg;
@@ -127,7 +117,6 @@
         function closeConfirm() { document.getElementById('confirm-modal').classList.add('hidden'); confirmAction = null; }
         document.getElementById('confirm-ok').onclick = () => { if(confirmAction) confirmAction(); closeConfirm(); };
 
-        /* Theme Management */
         function toggleDarkMode() {
             const body = document.body; const btn = document.getElementById('theme-toggle');
             body.classList.toggle('dark-mode');
@@ -155,22 +144,28 @@
                 localStorage.setItem('user_full_name', data.name || ''); 
                 localStorage.setItem('user_username', data.username || ''); 
                 localStorage.setItem('user_email', data.email || ''); 
-                // Mengambil data.phone_number sesuai respon backend
-                localStorage.setItem('user_phone', data.phone_number || ''); 
+                localStorage.setItem('user_phone', data.phone_number || ''); // Sinkron dengan DB
                 location.reload(); 
             } 
-            else { showNotify("Login Gagal! Periksa kembali akun Anda."); }
+            else { showNotify("Login Gagal! Akun tidak ditemukan."); }
         }
 
-        function confirmLogout() { showCustomConfirm("Yakin ingin mengakhiri sesi?", () => logout(), '🚪'); }
+        /* LOGOUT LOGIC - FIXED: Sesuai struktur popup sebelumnya */
+        function confirmLogout() { 
+            showCustomConfirm("Yakin ingin mengakhiri sesi?", () => logout(), '🚪'); 
+        }
         
-        /* Dashboard & Data Loading */
+        function logout() {
+            localStorage.clear(); // Bersihkan semua sesi
+            location.reload(); 
+        }
+        
         function showDashboard(role) { 
             document.getElementById('auth-section').classList.add('hidden'); 
             document.getElementById('dashboard').classList.remove('hidden'); 
             document.getElementById('welcome').innerText = localStorage.getItem('user_full_name') || 'Guest'; 
             refreshUserData(); 
-            setInterval(refreshUserData, 5000);
+            setInterval(refreshUserData, 5000); 
         }
         
         function refreshUserData() { 
@@ -191,7 +186,6 @@
 
         function confirmReturn(id) { showCustomConfirm("Kembalikan buku ini sekarang?", () => returnBook(id), '📚'); }
         
-        /* Profile Modal Logic - FIXED: Added Default empty strings */
         function toggleProfile() { 
             document.getElementById('profile-modal').classList.toggle('hidden'); 
             if(!document.getElementById('profile-modal').classList.contains('hidden')) { 
@@ -202,28 +196,23 @@
             } 
         }
 
-        /* Update Profile - FIXED: Send email to prevent NULL in DB */
         async function saveProfile() { 
             const n = document.getElementById('prof-name').value; 
             const u = document.getElementById('prof-user').value; 
-            const e = document.getElementById('prof-email').value; 
+            const e = document.getElementById('prof-email').value; // Ambil email agar tidak hilang
             const p = document.getElementById('prof-phone').value; 
             
             if(!n || !u || !p) return showNotify("Semua data profil wajib diisi!"); 
             
-            // Kirim email agar tidak tertimpa NULL di database
             const body = { full_name: n, username: u, email: e, phone_number: p }; 
-            
             const { status } = await callAPI(`${AUTH_URL}/profile/update`, 'POST', body, 'user'); 
             if(status === 200) { 
                 localStorage.setItem('user_full_name', body.full_name); 
                 localStorage.setItem('user_username', body.username); 
                 localStorage.setItem('user_phone', body.phone_number); 
                 showNotify("Profil Berhasil Diperbarui!", "success"); 
-                setTimeout(() => location.reload(), 1000);
-            } else {
-                showNotify("Gagal memperbarui profil.");
-            }
+                setTimeout(() => location.reload(), 1000); 
+            } 
         }
 
         async function borrowBook(id) { 

@@ -57,14 +57,29 @@ app.get('/books', (req, res) => {
     });
 });
 
-// --- ADMIN: CRUD BOOKS (Solusi agar tidak 404 saat tambah/hapus) ---
+/**
+ * ADMIN: CRUD BOOKS (DIPERBAIKI)
+ */
+
+// TAMBAH BUKU - Menambahkan year dan genre agar data lengkap
 app.post('/books', authenticate, (req, res) => {
     if (req.user.role !== 'admin') return res.status(403).json({ message: "Bukan Admin" });
-    const { title, author, stock, cover_url } = req.body;
-    const query = 'INSERT INTO books (title, author, stock, cover_url) VALUES (?, ?, ?, ?)';
-    db.query(query, [title, author, stock || 0, cover_url || ''], (err) => {
+    const { title, author, year, genre, stock, cover_url } = req.body;
+    const query = 'INSERT INTO books (title, author, year, genre, stock, cover_url) VALUES (?, ?, ?, ?, ?, ?)';
+    db.query(query, [title, author, year || null, genre || '', stock || 0, cover_url || ''], (err) => {
         if (err) return res.status(500).json(err);
         res.status(201).json({ message: "Buku berhasil ditambah!" });
+    });
+});
+
+// UPDATE BUKU - Solusi agar Edit tidak membuat buku baru
+app.put('/books/:id', authenticate, (req, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: "Bukan Admin" });
+    const { title, author, year, genre, stock, cover_url } = req.body;
+    const query = 'UPDATE books SET title = ?, author = ?, year = ?, genre = ?, stock = ?, cover_url = ? WHERE id = ?';
+    db.query(query, [title, author, year, genre, stock, cover_url, req.params.id], (err) => {
+        if (err) return res.status(500).json(err);
+        res.json({ message: "Buku berhasil diperbarui!" });
     });
 });
 
@@ -76,18 +91,16 @@ app.delete('/books/:id', authenticate, (req, res) => {
     });
 });
 
-// --- USER: BORROW BOOK (Mengembalikan logika riwayat yang hilang) ---
+// --- USER: BORROW BOOK ---
 app.post('/borrow', authenticate, (req, res) => {
     const { book_id, borrower_name, borrower_phone } = req.body;
     const date = getJakartaTime();
 
     db.query('SELECT stock FROM books WHERE id = ?', [book_id], (err, results) => {
         if (results && results.length > 0 && results[0].stock > 0) {
-            // Masukkan ke tabel borrowings sebagai riwayat
             const query = 'INSERT INTO borrowings (book_id, user_id, borrower_name, borrower_phone, borrow_date) VALUES (?, ?, ?, ?, ?)';
             db.query(query, [book_id, req.user.id, borrower_name, borrower_phone, date], (err) => {
                 if (err) return res.status(500).json(err);
-                // Kurangi stok buku
                 db.query('UPDATE books SET stock = stock - 1 WHERE id = ?', [book_id]);
                 res.json({ message: "Buku berhasil dipinjam!" });
             });
@@ -97,7 +110,7 @@ app.post('/borrow', authenticate, (req, res) => {
     });
 });
 
-// --- USER/ADMIN: RETURN BOOK (Mengembalikan logika pengembalian) ---
+// --- USER/ADMIN: RETURN BOOK ---
 app.post('/return', authenticate, (req, res) => {
     const { borrowing_id } = req.body;
     const date = getJakartaTime();
@@ -105,10 +118,8 @@ app.post('/return', authenticate, (req, res) => {
     db.query('SELECT book_id FROM borrowings WHERE id = ?', [borrowing_id], (err, results) => {
         if (results && results.length > 0) {
             const book_id = results[0].book_id;
-            // Update tanggal kembali
             db.query('UPDATE borrowings SET return_date = ? WHERE id = ?', [date, borrowing_id], (err) => {
                 if (err) return res.status(500).json(err);
-                // Tambah kembali stok buku
                 db.query('UPDATE books SET stock = stock + 1 WHERE id = ?', [book_id]);
                 res.json({ message: "Buku telah dikembalikan!" });
             });
@@ -118,7 +129,7 @@ app.post('/return', authenticate, (req, res) => {
     });
 });
 
-// --- HISTORY: GET ALL BORROWINGS (Riwayat Peminjaman) ---
+// --- HISTORY: GET ALL BORROWINGS ---
 app.get('/borrowings/all', authenticate, (req, res) => {
     let query = `
         SELECT b.*, bk.title, bk.cover_url 
